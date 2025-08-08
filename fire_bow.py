@@ -6,13 +6,14 @@ from pynput.mouse import Controller, Button
 import pygame
 import threading
 import sys
-import pyautogui
+from pynput.keyboard import Controller as KeyboardController, Key
 
 # Initialize pygame
 pygame.init()
 
 arduino = True
 mouse = Controller()
+current_key = None
 
 # === PARAMETERS ===
 SERIAL_PORT = '/dev/cu.usbserial-110'
@@ -22,6 +23,9 @@ DEBOUNCE_TIME = 0.2
 
 CAMERA_THRESHOLD = 2000
 sensitivity = 0.03
+
+keyboard = KeyboardController()
+
 
 last_trigger_time = 0
 is_mouse_pressed = False
@@ -103,7 +107,7 @@ def draw_status():
     pygame.display.flip()
 
 def run_serial_loop():
-    global last_trigger_time, is_mouse_pressed, current_value, bow_status
+    global last_trigger_time, is_mouse_pressed, current_value, bow_status, current_key
 
     if arduino:
         ports = serial.tools.list_ports.comports()
@@ -159,15 +163,31 @@ def run_serial_loop():
                             is_mouse_pressed = False
                             bow_status = "idle"
 
+                        # Decide which arrow key should be held
                         if values[-2] > CAMERA_THRESHOLD:
-                            mouse_dx =  - int(values[-2] * sensitivity)
+                            desired_key = 'left'
                         elif values[-1] > CAMERA_THRESHOLD:
-                            mouse_dx = int(values[-2] * sensitivity)
+                            desired_key = 'right'
                         else:
-                            mouse_dx =  0
-                        
-                        if mouse_dx != 0:
-                            pyautogui.moveRel(mouse_dx, 0)
+                            desired_key = None
+
+                        # If the desired key changed, update the key press
+                        if desired_key != current_key:
+                            # Release the previously held key
+                            if current_key == 'left':
+                                keyboard.release(Key.left)
+                            elif current_key == 'right':
+                                keyboard.release(Key.right)
+
+                            # Press the new key if any
+                            if desired_key == 'left':
+                                keyboard.press(Key.left)
+                            elif desired_key == 'right':
+                                keyboard.press(Key.right)
+
+                            current_key = desired_key
+
+
 
 
                 except Exception as e:
@@ -192,7 +212,7 @@ if __name__ == "__main__":
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            
+
             draw_status()
             clock.tick(30)  # 30 FPS
 
@@ -200,6 +220,12 @@ if __name__ == "__main__":
         print("\nShutting down...")
 
     finally:
+        if current_key == 'left':
+            keyboard.release(Key.left)
+        elif current_key == 'right':
+            keyboard.release(Key.right)
+
+
         if is_mouse_pressed:
             mouse.release(Button.right)
         pygame.quit()
