@@ -6,6 +6,7 @@ from pynput.mouse import Controller, Button
 import pygame
 import threading
 import sys
+import pyautogui
 
 # Initialize pygame
 pygame.init()
@@ -18,6 +19,9 @@ SERIAL_PORT = '/dev/cu.usbserial-110'
 BAUD_RATE = 115200
 TRIGGER_THRESHOLD = 4000
 DEBOUNCE_TIME = 0.2
+
+CAMERA_THRESHOLD = 2000
+sensitivity = 0.03
 
 last_trigger_time = 0
 is_mouse_pressed = False
@@ -123,7 +127,7 @@ def run_serial_loop():
                     line = serialCom.readline().decode('utf-8').strip()
                     if line == "":
                         continue
-
+                    print(line)
                     parts = line.split(',')
                     values = [float(p) for p in parts]
                     writer.writerow(values)
@@ -155,6 +159,17 @@ def run_serial_loop():
                             is_mouse_pressed = False
                             bow_status = "idle"
 
+                        if values[-2] > CAMERA_THRESHOLD:
+                            mouse_dx =  - int(values[-2] * sensitivity)
+                        elif values[-1] > CAMERA_THRESHOLD:
+                            mouse_dx = int(values[-2] * sensitivity)
+                        else:
+                            mouse_dx =  0
+                        
+                        if mouse_dx != 0:
+                            pyautogui.moveRel(mouse_dx, 0)
+
+
                 except Exception as e:
                     print("Serial error:", e)
                     continue
@@ -177,7 +192,7 @@ if __name__ == "__main__":
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-
+            
             draw_status()
             clock.tick(30)  # 30 FPS
 
