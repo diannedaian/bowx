@@ -14,6 +14,7 @@ pygame.init()
 arduino = True
 mouse = Controller()
 current_key = None
+current_vertical_key = None
 
 # === PARAMETERS ===
 SERIAL_PORT = '/dev/cu.usbserial-110'
@@ -107,7 +108,7 @@ def draw_status():
     pygame.display.flip()
 
 def run_serial_loop():
-    global last_trigger_time, is_mouse_pressed, current_value, bow_status, current_key
+    global last_trigger_time, is_mouse_pressed, current_value, bow_status, current_key, current_vertical_key
 
     if arduino:
         ports = serial.tools.list_ports.comports()
@@ -137,7 +138,7 @@ def run_serial_loop():
                     writer.writerow(values)
                     f.flush()
 
-                    if len(values) >= 3:
+                    if len(values) >= 5:  # Need at least 5 values for all controls
                         val = max(values[0], values[1], values[2])
                         current_value = val
                         current_time = time.time()
@@ -163,15 +164,15 @@ def run_serial_loop():
                             is_mouse_pressed = False
                             bow_status = "idle"
 
-                        # Decide which arrow key should be held
-                        if values[-2] > CAMERA_THRESHOLD:
+                        # Decide which horizontal arrow key should be held
+                        if values[-4] > CAMERA_THRESHOLD:
                             desired_key = 'left'
-                        elif values[-1] > CAMERA_THRESHOLD:
+                        elif values[-3] > CAMERA_THRESHOLD:
                             desired_key = 'right'
                         else:
                             desired_key = None
 
-                        # If the desired key changed, update the key press
+                        # If the desired horizontal key changed, update the key press
                         if desired_key != current_key:
                             # Release the previously held key
                             if current_key == 'left':
@@ -186,6 +187,30 @@ def run_serial_loop():
                                 keyboard.press(Key.right)
 
                             current_key = desired_key
+
+                        # Decide which vertical arrow key should be held
+                        if values[-2] > CAMERA_THRESHOLD:
+                            desired_vertical_key = 'up'
+                        elif values[-1] > CAMERA_THRESHOLD:
+                            desired_vertical_key = 'down'
+                        else:
+                            desired_vertical_key = None
+
+                        # If the desired vertical key changed, update the key press
+                        if desired_vertical_key != current_vertical_key:
+                            # Release the previously held key
+                            if current_vertical_key == 'up':
+                                keyboard.release(Key.up)
+                            elif current_vertical_key == 'down':
+                                keyboard.release(Key.down)
+
+                            # Press the new key if any
+                            if desired_vertical_key == 'up':
+                                keyboard.press(Key.up)
+                            elif desired_vertical_key == 'down':
+                                keyboard.press(Key.down)
+
+                            current_vertical_key = desired_vertical_key
 
 
 
@@ -220,11 +245,17 @@ if __name__ == "__main__":
         print("\nShutting down...")
 
     finally:
+        # Release any held horizontal keys
         if current_key == 'left':
             keyboard.release(Key.left)
         elif current_key == 'right':
             keyboard.release(Key.right)
 
+        # Release any held vertical keys
+        if current_vertical_key == 'up':
+            keyboard.release(Key.up)
+        elif current_vertical_key == 'down':
+            keyboard.release(Key.down)
 
         if is_mouse_pressed:
             mouse.release(Button.right)
